@@ -359,22 +359,6 @@
             border: 1px solid var(--border-color);
             padding: 5px 12px;
             border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .pagination button:hover {
-            background-color: var(--accent-color);
-            color: var(--darker-bg);
-        }
-        
-        .pagination button.active {
-            background-color: var(--accent-color);
-            color: var(--darker-bg);
-            font-weight: 600;
-        }
-        
-        footer {
             text-align: center;
             padding: 20px;
             color: var(--text-secondary);
@@ -1022,45 +1006,9 @@
         
         // Initialize the app
         document.addEventListener('DOMContentLoaded', () => {
-            // Sample data for demonstration
-            const sampleData = [
-                {
-                    no: 1,
-                    dateTime: "2023-10-01 08:15:30",
-                    location: "New York, NY",
-                    lat: 40.7128,
-                    lng: -74.0060,
-                    speed: 65,
-                    heading: 45,
-                    odometer: 12345,
-                    engHours: 12.3
-                },
-                {
-                    no: 2,
-                    dateTime: "2023-10-01 09:30:45",
-                    location: "Philadelphia, PA",
-                    lat: 39.9526,
-                    lng: -75.1652,
-                    speed: 0,
-                    heading: 0,
-                    odometer: 12456,
-                    engHours: 13.1
-                },
-                {
-                    no: 3,
-                    dateTime: "2023-10-01 11:20:15",
-                    location: "Baltimore, MD",
-                    lat: 39.2904,
-                    lng: -76.6122,
-                    speed: 55,
-                    heading: 120,
-                    odometer: 12678,
-                    engHours: 14.5
-                }
-            ];
-            
-            parsedData = sampleData;
-            filteredData = sampleData;
+            // Start with empty data
+            parsedData = [];
+            filteredData = [];
             renderTable();
         });
     </script>
