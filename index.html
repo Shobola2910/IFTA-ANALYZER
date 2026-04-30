@@ -22,6 +22,7 @@
             --row-odd: #1e1e1e;
             --progress-bg: #333;
             --progress-fill: #4db6ac;
+            --warning-color: #ff9800;
         }
         
         * {
@@ -80,6 +81,12 @@
             margin-bottom: 30px;
         }
         
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
         .upload-section, .filter-section {
             background-color: var(--panel-bg);
             border-radius: 8px;
@@ -98,10 +105,6 @@
             gap: 10px;
         }
         
-        .section-title i {
-            font-size: 1.2rem;
-        }
-        
         .drop-area {
             border: 2px dashed var(--accent-color);
             border-radius: 8px;
@@ -111,6 +114,11 @@
             transition: all 0.3s ease;
             background-color: rgba(77, 182, 172, 0.05);
             margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
         }
         
         .drop-area:hover {
@@ -227,22 +235,7 @@
         }
         
         .radio-item input {
-            width: auto;
-        }
-        
-        .progress-container {
-            background-color: var(--progress-bg);
-            border-radius: 4px;
-            height: 20px;
-            margin: 15px 0;
-            overflow: hidden;
-        }
-        
-        .progress-bar {
-            height: 100%;
-            background-color: var(--progress-fill);
-            width: 0%;
-            transition: width 0.5s ease;
+            width;
         }
         
         .progress-text {
@@ -262,6 +255,13 @@
             margin: 20px 0;
             font-family: 'IBM Plex Mono', monospace;
             border: 1px solid var(--border-color);
+        }
+        
+        @media (max-width: 1200px) {
+            .stats-container {
+                flex-direction: column;
+                gap: 10px;
+            }
         }
         
         .stat-item {
@@ -359,23 +359,28 @@
             border: 1px solid var(--border-color);
             padding: 5px 12px;
             border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .pagination button:hover {
+            background-color: var(--accent-color);
+            color: var(--darker-bg);
+        }
+        
+        .pagination button.active {
+            background-color: var(--accent-color);
+            color: var(--darker-bg);
+            font-weight: 600;
+        }
+        
+        footer {
             text-align: center;
             padding: 20px;
             color: var(--text-secondary);
             font-size: 0.9rem;
             border-top: 1px solid var(--border-color);
             margin-top: 30px;
-        }
-        
-        @media (max-width: 1200px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-            
-            .stats-container {
-                flex-direction: column;
-                gap: 10px;
-            }
         }
         
         .loading {
@@ -413,6 +418,24 @@
             font-family: 'IBM Plex Mono', monospace;
             display: none;
         }
+        
+        .warning-message {
+            color: var(--warning-color);
+            background-color: rgba(255, 152, 0, 0.1);
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            border: 1px solid var(--warning-color);
+            font-family: 'IBM Plex Mono', monospace;
+            display: none;
+        }
+        
+        .filter-help {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 5px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -446,6 +469,7 @@
                     
                     <div class="error-message" id="errorMessage"></div>
                     <div class="info-message" id="infoMessage"></div>
+                    <div class="warning-message" id="warningMessage"></div>
                     
                     <div class="stats-container">
                         <div class="stat-item">
@@ -490,6 +514,15 @@
                         <div class="filter-group">
                             <label for="locationFilter">Joylashuv bo'yicha qidirish:</label>
                             <input type="text" id="locationFilter" placeholder="Shahar yoki joy nomi...">
+                            <div class="filter-help">Filtrni tozalash uchun maydonni bo'shating</div>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="dateFilter">Sana oralig'i:</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="date" id="startDate" style="flex: 1;">
+                                <input type="date" id="endDate" style="flex: 1;">
+                            </div>
                         </div>
                     </div>
                     
@@ -507,6 +540,9 @@
             <div class="data-section">
                 <div class="section-title">
                     <span>Tahlil qilingan ma'lumotlar</span>
+                    <button class="btn" id="clearFiltersBtn" style="margin-left: auto; padding: 5px 10px; font-size: 0.9rem;">
+                        <span>Filtrlarni tozalash</span>
+                    </button>
                 </div>
                 
                 <div class="table-container">
@@ -567,10 +603,16 @@
         const stoppedStatus = document.getElementById('stoppedStatus');
         const errorMessage = document.getElementById('errorMessage');
         const infoMessage = document.getElementById('infoMessage');
+        const warningMessage = document.getElementById('warningMessage');
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        const locationFilter = document.getElementById('locationFilter');
+        const startDate = document.getElementById('startDate');
+        const endDate = document.getElementById('endDate');
         
         // Event listeners
         selectFileBtn.addEventListener('click', () => fileInput.click());
         fileInput.addEventListener('change', handleFileSelect);
+        clearFiltersBtn.addEventListener('click', clearFilters);
         
         // Drag and drop events
         dropArea.addEventListener('dragover', (e) => {
@@ -604,11 +646,23 @@
             radio.addEventListener('change', applyFilters);
         });
         
-        document.getElementById('locationFilter').addEventListener('input', applyFilters);
+        locationFilter.addEventListener('input', applyFilters);
+        startDate.addEventListener('change', applyFilters);
+        endDate.addEventListener('change', applyFilters);
         
         // Export buttons
         exportPdfBtn.addEventListener('click', exportToPdf);
         exportCsvBtn.addEventListener('click', exportToCsv);
+        
+        // Clear filters function
+        function clearFilters() {
+            document.getElementById('filterAll').checked = true;
+            locationFilter.value = '';
+            startDate.value = '';
+            endDate.value = '';
+            applyFilters();
+            showInfo("Barcha filtrlardan tozalandi");
+        }
         
         // Handle file selection
         function handleFileSelect(e) {
@@ -631,6 +685,9 @@
             totalPages = 1;
             tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">PDF tahlil qilinmoqda...</td></tr>';
             updateStats();
+            
+            // Clear filters
+            clearFilters();
             
             // Show info message
             showInfo("PDF tahlil qilinmoqda, iltimos kuting...");
@@ -684,6 +741,9 @@
                             progressBar.style.width = `${progress}%`;
                             progressText.textContent = `Sahifa ${pageNum} / ${totalPages} — ${parsedData.length} ta status topildi`;
                         });
+                    }).catch(error => {
+                        console.error(`Page ${pageNum} parsing error:`, error);
+                        return [];
                     })
                 );
             }
@@ -694,6 +754,12 @@
                 progressBar.style.width = '100%';
                 progressText.textContent = `Tahlil yakunlandi! Jami: ${parsedData.length} ta status`;
                 
+                if (parsedData.length === 0) {
+                    showWarning("PDF fayldan hech qanday ma'lumot topilmadi. Formatni tekshiring.");
+                    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">Hech qanday ma\'lumot topilmadi</td></tr>';
+                    return;
+                }
+                
                 // Sort data by datetime
                 parsedData.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
                 
@@ -701,6 +767,16 @@
                 parsedData.forEach((entry, index) => {
                     entry.no = index + 1;
                 });
+                
+                // Set date range for filters
+                if (parsedData.length > 0) {
+                    const firstDate = new Date(parsedData[0].dateTime);
+                    const lastDate = new Date(parsedData[parsedData.length - 1].dateTime);
+                    startDate.min = formatDateForInput(firstDate);
+                    startDate.max = formatDateForInput(lastDate);
+                    endDate.min = formatDateForInput(firstDate);
+                    endDate.max = formatDateForInput(lastDate);
+                }
                 
                 // Update stats and apply filters
                 updateStats();
@@ -712,6 +788,11 @@
             }).catch(error => {
                 showError(`PDF tahlil qilishda xato: ${error.message}`);
             });
+        }
+        
+        // Format date for input fields
+        function formatDateForInput(date) {
+            return date.toISOString().split('T')[0];
         }
         
         // Extract entries from page text content
@@ -736,7 +817,7 @@
                 
                 const lineText = lineItems.map(item => item.str).join(' ');
                 
-                // Simple regex to match data rows
+                // Improved regex to match data rows
                 const regex = /(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+([\w\s,.]+?)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+\.\d+)/;
                 const match = lineText.match(regex);
                 
@@ -764,7 +845,9 @@
         // Apply filters to the data
         function applyFilters() {
             const statusFilter = document.querySelector('input[name="statusFilter"]:checked').value;
-            const locationFilter = document.getElementById('locationFilter').value.toLowerCase();
+            const locationFilterVal = locationFilter.value.toLowerCase();
+            const startDateVal = startDate.value;
+            const endDateVal = endDate.value;
             
             filteredData = parsedData.filter(entry => {
                 // Status filter
@@ -772,7 +855,12 @@
                 if (statusFilter === 'stopped' && entry.speed > 0) return false;
                 
                 // Location filter
-                if (locationFilter && !entry.location.toLowerCase().includes(locationFilter)) return false;
+                if (locationFilterVal && !entry.location.toLowerCase().includes(locationFilterVal)) return false;
+                
+                // Date range filter
+                const entryDate = new Date(entry.dateTime).toISOString().split('T')[0];
+                if (startDateVal && entryDate < startDateVal) return false;
+                if (endDateVal && entryDate > endDateVal) return false;
                 
                 return true;
             });
@@ -786,6 +874,13 @@
             
             // Render current page
             renderTable();
+            
+            // Show warning if no data matches filters
+            if (filteredData.length === 0 && parsedData.length > 0) {
+                showWarning("Filtr bo'yicha hech qanday ma'lumot topilmadi. Filtrlarni o'zgartiring.");
+            } else {
+                hideWarning();
+            }
         }
         
         // Update statistics
@@ -801,6 +896,11 @@
         
         // Render data table
         function renderTable() {
+            if (parsedData.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: var(--text-secondary);">PDF fayl yuklang va tahlil qilishni boshlang</td></tr>';
+                return;
+            }
+            
             if (filteredData.length === 0) {
                 tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">Filtr bo\'yicha hech qanday ma\'lumot topilmadi</td></tr>';
                 return;
@@ -1001,15 +1101,28 @@
             infoMessage.style.display = 'none';
         }
         
+        function showWarning(message) {
+            warningMessage.textContent = message;
+            warningMessage.style.display = 'block';
+        }
+        
+        function hideWarning() {
+            warningMessage.style.display = 'none';
+        }
+        
         // Make changePage function available globally
         window.changePage = changePage;
         
         // Initialize the app
         document.addEventListener('DOMContentLoaded', () => {
-            // Start with empty data
-            parsedData = [];
-            filteredData = [];
-            renderTable();
+            // Set today's date as default end date
+            const today = new Date();
+            endDate.value = today.toISOString().split('T')[0];
+            
+            // Set start date to 7 days ago
+            const weekAgo = new Date();
+            weekAgo.setDate(today.getDate() - 7);
+            startDate.value = weekAgo.toISOString().split('T')[0];
         });
     </script>
 </body>
