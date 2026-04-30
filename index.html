@@ -235,7 +235,22 @@
         }
         
         .radio-item input {
-            width;
+            width: auto;
+        }
+        
+        .progress-container {
+            background-color: var(--progress-bg);
+            border-radius: 4px;
+            height: 20px;
+            margin: 15px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background-color: var(--progress-fill);
+            width: 0%;
+            transition: width 0.5s ease;
         }
         
         .progress-text {
@@ -344,6 +359,11 @@
         .odometer {
             font-weight: 700;
             color: var(--accent-color);
+        }
+        
+        .mile-group {
+            font-weight: 600;
+            color: #4db6ac;
         }
         
         .pagination {
@@ -516,14 +536,6 @@
                             <input type="text" id="locationFilter" placeholder="Shahar yoki joy nomi...">
                             <div class="filter-help">Filtrni tozalash uchun maydonni bo'shating</div>
                         </div>
-                        
-                        <div class="filter-group">
-                            <label for="dateFilter">Sana oralig'i:</label>
-                            <div style="display: flex; gap: 10px;">
-                                <input type="date" id="startDate" style="flex: 1;">
-                                <input type="date" id="endDate" style="flex: 1;">
-                            </div>
-                        </div>
                     </div>
                     
                     <div class="export-buttons">
@@ -552,6 +564,7 @@
                                 <th>No</th>
                                 <th>Date & Time (UTC)</th>
                                 <th>Location</th>
+                                <th>Mile Group</th>
                                 <th>Lat</th>
                                 <th>Lng</th>
                                 <th>Speed</th>
@@ -562,7 +575,7 @@
                         </thead>
                         <tbody id="tableBody">
                             <tr>
-                                <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-secondary);">
+                                <td colspan="10" style="text-align: center; padding: 30px; color: var(--text-secondary);">
                                     PDF fayl yuklang va tahlil qilishni boshlang
                                 </td>
                             </tr>
@@ -587,6 +600,7 @@
         let currentPage = 1;
         const pageSize = 100;
         let totalPages = 1;
+        let mileGroupLocations = {}; // Store mile group locations
         
         // DOM elements
         const dropArea = document.getElementById('dropArea');
@@ -606,8 +620,6 @@
         const warningMessage = document.getElementById('warningMessage');
         const clearFiltersBtn = document.getElementById('clearFiltersBtn');
         const locationFilter = document.getElementById('locationFilter');
-        const startDate = document.getElementById('startDate');
-        const endDate = document.getElementById('endDate');
         
         // Event listeners
         selectFileBtn.addEventListener('click', () => fileInput.click());
@@ -647,8 +659,6 @@
         });
         
         locationFilter.addEventListener('input', applyFilters);
-        startDate.addEventListener('change', applyFilters);
-        endDate.addEventListener('change', applyFilters);
         
         // Export buttons
         exportPdfBtn.addEventListener('click', exportToPdf);
@@ -658,8 +668,6 @@
         function clearFilters() {
             document.getElementById('filterAll').checked = true;
             locationFilter.value = '';
-            startDate.value = '';
-            endDate.value = '';
             applyFilters();
             showInfo("Barcha filtrlardan tozalandi");
         }
@@ -681,9 +689,10 @@
             // Reset previous data
             parsedData = [];
             filteredData = [];
+            mileGroupLocations = {};
             currentPage = 1;
             totalPages = 1;
-            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">PDF tahlil qilinmoqda...</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px;">PDF tahlil qilinmoqda...</td></tr>';
             updateStats();
             
             // Clear filters
@@ -713,6 +722,7 @@
         // Parse PDF pages
         function parsePages(pdf, totalPages) {
             parsedData = [];
+            mileGroupLocations = {};
             const seenTimestamps = new Set();
             
             // Create an array of page promises
@@ -756,7 +766,7 @@
                 
                 if (parsedData.length === 0) {
                     showWarning("PDF fayldan hech qanday ma'lumot topilmadi. Formatni tekshiring.");
-                    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">Hech qanday ma\'lumot topilmadi</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px;">Hech qanday ma\'lumot topilmadi</td></tr>';
                     return;
                 }
                 
@@ -768,15 +778,8 @@
                     entry.no = index + 1;
                 });
                 
-                // Set date range for filters
-                if (parsedData.length > 0) {
-                    const firstDate = new Date(parsedData[0].dateTime);
-                    const lastDate = new Date(parsedData[parsedData.length - 1].dateTime);
-                    startDate.min = formatDateForInput(firstDate);
-                    startDate.max = formatDateForInput(lastDate);
-                    endDate.min = formatDateForInput(firstDate);
-                    endDate.max = formatDateForInput(lastDate);
-                }
+                // Calculate mile groups and their locations
+                calculateMileGroups();
                 
                 // Update stats and apply filters
                 updateStats();
@@ -790,9 +793,31 @@
             });
         }
         
-        // Format date for input fields
-        function formatDateForInput(date) {
-            return date.toISOString().split('T')[0];
+        // Calculate mile groups and their locations
+        function calculateMileGroups() {
+            mileGroupLocations = {};
+            
+            // Group entries by mile
+            const mileGroups = {};
+            parsedData.forEach(entry => {
+                // Round odometer to nearest mile
+                const mileGroup = Math.floor(entry.odometer);
+                
+                if (!mileGroups[mileGroup]) {
+                    mileGroups[mileGroup] = [];
+                }
+                mileGroups[mileGroup].push(entry);
+            });
+            
+            // Determine location for each mile group (first entry in the group)
+            Object.keys(mileGroups).forEach(mile => {
+                const groupEntries = mileGroups[mile];
+                if (groupEntries.length > 0) {
+                    // Sort by datetime to get the first entry
+                    groupEntries.sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
+                    mileGroupLocations[mile] = groupEntries[0].location;
+                }
+            });
         }
         
         // Extract entries from page text content
@@ -846,8 +871,6 @@
         function applyFilters() {
             const statusFilter = document.querySelector('input[name="statusFilter"]:checked').value;
             const locationFilterVal = locationFilter.value.toLowerCase();
-            const startDateVal = startDate.value;
-            const endDateVal = endDate.value;
             
             filteredData = parsedData.filter(entry => {
                 // Status filter
@@ -856,11 +879,6 @@
                 
                 // Location filter
                 if (locationFilterVal && !entry.location.toLowerCase().includes(locationFilterVal)) return false;
-                
-                // Date range filter
-                const entryDate = new Date(entry.dateTime).toISOString().split('T')[0];
-                if (startDateVal && entryDate < startDateVal) return false;
-                if (endDateVal && entryDate > endDateVal) return false;
                 
                 return true;
             });
@@ -897,12 +915,12 @@
         // Render data table
         function renderTable() {
             if (parsedData.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px; color: var(--text-secondary);">PDF fayl yuklang va tahlil qilishni boshlang</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px; color: var(--text-secondary);">PDF fayl yuklang va tahlil qilishni boshlang</td></tr>';
                 return;
             }
             
             if (filteredData.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 30px;">Filtr bo\'yicha hech qanday ma\'lumot topilmadi</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px;">Filtr bo\'yicha hech qanday ma\'lumot topilmadi</td></tr>';
                 return;
             }
             
@@ -913,11 +931,16 @@
             let tableHTML = '';
             
             pageData.forEach(entry => {
+                // Get mile group for this entry
+                const mileGroup = Math.floor(entry.odometer);
+                const mileGroupLocation = mileGroupLocations[mileGroup] || entry.location;
+                
                 tableHTML += `
                     <tr>
                         <td>${entry.no}</td>
                         <td>${entry.dateTime}</td>
                         <td>${entry.location}</td>
+                        <td class="mile-group">${mileGroup} mil: ${mileGroupLocation}</td>
                         <td>${entry.lat.toFixed(6)}</td>
                         <td>${entry.lng.toFixed(6)}</td>
                         <td>${entry.speed} km/h</td>
@@ -1002,6 +1025,7 @@
                 'No', 
                 'Date & Time (UTC)', 
                 'Location', 
+                'Mile Group',
                 'Lat', 
                 'Lng', 
                 'Speed', 
@@ -1010,17 +1034,23 @@
                 'Eng. Hours'
             ];
             
-            const data = filteredData.map(entry => [
-                entry.no,
-                entry.dateTime,
-                entry.location,
-                entry.lat.toFixed(6),
-                entry.lng.toFixed(6),
-                `${entry.speed} km/h`,
-                `${entry.heading}°`,
-                entry.odometer.toLocaleString(),
-                entry.engHours.toFixed(2)
-            ]);
+            const data = filteredData.map(entry => {
+                const mileGroup = Math.floor(entry.odometer);
+                const mileGroupLocation = mileGroupLocations[mileGroup] || entry.location;
+                
+                return [
+                    entry.no,
+                    entry.dateTime,
+                    entry.location,
+                    `${mileGroup} mil: ${mileGroupLocation}`,
+                    entry.lat.toFixed(6),
+                    entry.lng.toFixed(6),
+                    `${entry.speed} km/h`,
+                    `${entry.heading}°`,
+                    entry.odometer.toLocaleString(),
+                    entry.engHours.toFixed(2)
+                ];
+            });
             
             // Add table with jspdf-autotable
             doc.autoTable({
@@ -1043,7 +1073,7 @@
                     fillColor: [247, 249, 251]
                 },
                 columnStyles: {
-                    7: { fontStyle: 'bold' } // Odometer column
+                    8: { fontStyle: 'bold' } // Odometer column
                 },
                 margin: { top: 80 }
             });
@@ -1063,10 +1093,13 @@
             showInfo("CSV fayli yaratilmoqda...");
             
             // Create CSV content
-            let csvContent = "No,Date & Time (UTC),Location,Lat,Lng,Speed,Heading,Odometer,Eng. Hours\n";
+            let csvContent = "No,Date & Time (UTC),Location,Mile Group,Lat,Lng,Speed,Heading,Odometer,Eng. Hours\n";
             
             filteredData.forEach(entry => {
-                csvContent += `${entry.no},${entry.dateTime},${entry.location},${entry.lat},${entry.lng},${entry.speed},${entry.heading},${entry.odometer},${entry.engHours}\n`;
+                const mileGroup = Math.floor(entry.odometer);
+                const mileGroupLocation = mileGroupLocations[mileGroup] || entry.location;
+                
+                csvContent += `${entry.no},${entry.dateTime},${entry.location},"${mileGroup} mil: ${mileGroupLocation}",${entry.lat},${entry.lng},${entry.speed},${entry.heading},${entry.odometer},${entry.engHours}\n`;
             });
             
             // Create download link
@@ -1112,18 +1145,6 @@
         
         // Make changePage function available globally
         window.changePage = changePage;
-        
-        // Initialize the app
-        document.addEventListener('DOMContentLoaded', () => {
-            // Set today's date as default end date
-            const today = new Date();
-            endDate.value = today.toISOString().split('T')[0];
-            
-            // Set start date to 7 days ago
-            const weekAgo = new Date();
-            weekAgo.setDate(today.getDate() - 7);
-            startDate.value = weekAgo.toISOString().split('T')[0];
-        });
     </script>
 </body>
 </html>
